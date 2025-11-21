@@ -1,0 +1,23 @@
+fastapi==0.100.0
+uvicorn[standard]==0.23.2
+python-multipart==0.0.6
+sqlmodel==0.0.8
+passlib[bcrypt]==1.7.4
+PyJWT==2.8.0
+aiohttp==3.9.5
+python-dotenv==1.0.0
+requests==2.31.0
+ultralytics    # YOLOv8 inference library
+
+
+
+
+# sqlalchemy
+# psycopg2-binary
+# python-jose[cryptography]
+# passlib[bcrypt]
+# pydantic
+# python-multipart
+# Pillow
+# openai         # used in OpenAI-compatible client call to GEMINI (or google generative lib)
+# requests

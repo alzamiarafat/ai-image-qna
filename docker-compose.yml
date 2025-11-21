@@ -1,0 +1,64 @@
+services:
+  backend:
+    container_name: yolo-backend
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    # restart: always
+# # version: "3.8"
+
+# # services:
+# #   backend:
+# #     build: ./backend
+# #     container_name: yolo-backend
+# #     ports:
+# #       - "8000:8000"
+# #     volumes:
+# #       - ./backend/app:/app
+# #       - model_cache:/root/.cache
+# #     environment:
+# #       - PYTHONUNBUFFERED=1
+# #     # Uncomment this if you have an NVIDIA GPU:
+# #     # deploy:
+# #     #   resources:
+# #     #     reservations:
+# #     #       devices:
+# #     #         - driver: nvidia
+# #     #           count: all
+# #     #           capabilities: [gpu]
+
+# #   # frontend:
+# #   #   build: ./frontend
+# #   #   container_name: yolo-frontend
+# #   #   ports:
+# #   #     - "5173:5173"
+# #   #   environment:
+# #   #     - CHOKIDAR_USEPOLLING=true
+# #   #   depends_on:
+# #   #     - backend
+
+# # volumes:
+# #   model_cache:
+
+# version: "3.8"
+
+# services:
+#   backend:
+#     build: ./backend
+#     container_name: yolo-backend
+#     ports:
+#       - "8000:8000"
+#     depends_on:
+#       - external-api
+
+#   frontend:
+#     build: ./frontend
+#     container_name: yolo-frontend
+#     ports:
+#       - "5173:5173"
+#     depends_on:
+#       - backend
