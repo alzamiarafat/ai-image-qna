@@ -41,4 +41,4 @@ async def ask_ai(detections, question):
 
     response = await run_in_threadpool(call_gemini)
 
-    return response
+    return response.text

@@ -9,6 +9,7 @@ export default function AIVisionDashboard() {
   const [imageActive, setImageActive] = useState(false);
   const [fileInput, setFileInput] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [inputValue, setInputValue] = useState("");
 
   const [rows, setRows] = useState([]);
 
@@ -22,16 +23,7 @@ export default function AIVisionDashboard() {
 
   const [messages, setMessages] = useState<
     { who: "user" | "ai"; text: string }[]
-  >([
-    {
-      who: "user",
-      text: "What is the confidence score of the largest object?",
-    },
-    {
-      who: "ai",
-      text: "Based on the detection results, the largest object is the Car ...",
-    },
-  ]);
+  >([]);
 
   // Handle file and create preview
   function handleFile(file: File) {
@@ -174,7 +166,6 @@ export default function AIVisionDashboard() {
     const colors = ["#10b981", "#2563eb", "#f59e0b", "#ec4899", "#8b5cf6"];
 
     rows.forEach((r, idx) => {
-      console.log("🚀 ~ AIVisionDashboard ~ r:", r);
       const [x1, y1, x2, y2] = r.bbox
         .replace(/[()]/g, "")
         .split(",")
@@ -194,6 +185,55 @@ export default function AIVisionDashboard() {
   // Example: programmatically add a message (e.g., after a detection)
   function addAIMessage(text: string) {
     setMessages((m) => [...m, { who: "ai", text }]);
+  }
+
+  async function sendMessage() {
+    const val = inputValue.trim();
+    if (!val) return;
+
+    // push user message ⬇
+    setMessages((m) => [...m, { who: "user", text: val }]);
+
+    // clear input
+    setInputValue("");
+
+    try {
+      // ---- REAL API CALL ----
+      const payload = {
+        question: "How many dog are there?",
+        detections: rows.map((r) => ({
+          class: r.object.toLowerCase(),
+          confidence: r.confidence / 100,
+          bbox: r.bbox_array, // make sure this is [x1, y1, x2, y2] numbers
+        })),
+      };
+      const res = await fetch("http://localhost:8000/ai/question", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error("Network response failed");
+      }
+
+      const data = await res.json();
+
+      // Push AI message
+      setMessages((m) => [
+        ...m,
+        { who: "ai", text: data.reply || data.answer || "No response" },
+      ]);
+    } catch (err) {
+      // Handle failure
+      setMessages((m) => [
+        ...m,
+        { who: "ai", text: "Error: Failed to get response from server." },
+      ]);
+      console.error(err);
+    }
   }
 
   return (
@@ -436,31 +476,13 @@ export default function AIVisionDashboard() {
                 type="text"
                 className="qa-input"
                 placeholder="Ask a question about the detected objects..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const val = (e.target as HTMLInputElement).value.trim();
-                    if (val) {
-                      setMessages((m) => [...m, { who: "user", text: val }]);
-                      // call your AI backend here and push response
-                      setTimeout(
-                        () =>
-                          setMessages((m) => [
-                            ...m,
-                            { who: "ai", text: "AI response placeholder" },
-                          ]),
-                        800
-                      );
-                      (e.target as HTMLInputElement).value = "";
-                    }
-                  }
+                  if (e.key === "Enter") sendMessage();
                 }}
               />
-              <button
-                className="qa-submit"
-                onClick={() => {
-                  // optionally wire to the input's value
-                }}
-              >
+              <button className="qa-submit" onClick={sendMessage}>
                 Send
               </button>
             </div>
