@@ -8,6 +8,7 @@ services:
       - ./backend/app:/app
     environment:
       - PYTHONUNBUFFERED=1
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
     # restart: always
 # # version: "3.8"
 

@@ -8,16 +8,5 @@ aiohttp==3.9.5
 python-dotenv==1.0.0
 requests==2.31.0
 ultralytics    # YOLOv8 inference library
-
-
-
-
-# sqlalchemy
-# psycopg2-binary
-# python-jose[cryptography]
-# passlib[bcrypt]
-# pydantic
-# python-multipart
-# Pillow
-# openai         # used in OpenAI-compatible client call to GEMINI (or google generative lib)
-# requests
+openai
+google-generativeai

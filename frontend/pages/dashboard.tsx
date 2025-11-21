@@ -1,115 +1,200 @@
 import React, {useEffect, useState, useRef, useMemo } from "react";
 
 export default function AIVisionDashboard() {
-   const fileInputRef = useRef<HTMLInputElement | null>(null);
-   const uploadAreaRef = useRef<HTMLDivElement | null>(null);
-   const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadAreaRef = useRef<HTMLDivElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
 
-   const [previewSrc, setPreviewSrc] = useState<string>("");
-   const [imageActive, setImageActive] = useState(false);
-   const [dragOver, setDragOver] = useState(false);
+  const [previewSrc, setPreviewSrc] = useState<string>("");
+  const [imageActive, setImageActive] = useState(false);
+  const [fileInput, setFileInput] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
 
-   const [rows, setRows] = useState([
-     { object: "Car", confidence: 94, bbox: "(80, 120, 260, 280)" },
-     { object: "Person", confidence: 89, bbox: "(340, 80, 480, 260)" },
-     { object: "Bike", confidence: 87, bbox: "(150, 260, 250, 340)" },
-     { object: "Tree", confidence: 82, bbox: "(20, 30, 100, 90)" },
-     { object: "Sign", confidence: 76, bbox: "(380, 280, 500, 370)" },
-   ]);
+  const [rows, setRows] = useState([]);
 
-   const [sortState, setSortState] = useState<{
-     col: number | null;
-     asc: boolean;
-   }>({
-     col: null,
-     asc: false,
-   });
+  const [sortState, setSortState] = useState<{
+    col: number | null;
+    asc: boolean;
+  }>({
+    col: null,
+    asc: false,
+  });
 
-   const [messages, setMessages] = useState<
-     { who: "user" | "ai"; text: string }[]
-   >([
-     {
-       who: "user",
-       text: "What is the confidence score of the largest object?",
-     },
-     {
-       who: "ai",
-       text: "Based on the detection results, the largest object is the Car ...",
-     },
-   ]);
+  const [messages, setMessages] = useState<
+    { who: "user" | "ai"; text: string }[]
+  >([
+    {
+      who: "user",
+      text: "What is the confidence score of the largest object?",
+    },
+    {
+      who: "ai",
+      text: "Based on the detection results, the largest object is the Car ...",
+    },
+  ]);
 
-   // File handlers
-   function handleFile(file: File) {
-     const reader = new FileReader();
-     reader.onload = (e) => {
-       setPreviewSrc(String(e.target?.result ?? ""));
-       setImageActive(true);
-     };
-     reader.readAsDataURL(file);
-   }
+  // Handle file and create preview
+  function handleFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreviewSrc(String(e.target?.result ?? ""));
+      setImageActive(true);
+    };
+    reader.readAsDataURL(file);
+  }
 
-   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-     const file = e.target.files?.[0];
-     if (file && file.type.startsWith("image/")) handleFile(file);
-   }
+  // Handle file selection via input
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setFileInput(file);
+    if (!file) return;
 
-   function onUploadAreaClick() {
-     fileInputRef.current?.click();
-   }
+    handleFile(file);
 
-   function onDragOver(e: React.DragEvent<HTMLDivElement>) {
-     e.preventDefault();
-     setDragOver(true);
-   }
+    // Reset input so same file can be selected again
+    // if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-   function onDragLeave() {
-     setDragOver(false);
-   }
+  function onUploadAreaClick() {
+    fileInputRef.current?.click();
+  }
 
-   function onDrop(e: React.DragEvent<HTMLDivElement>) {
-     e.preventDefault();
-     setDragOver(false);
-     const file = e.dataTransfer.files?.[0];
-     if (file && file.type.startsWith("image/")) handleFile(file);
-   }
+  async function detectImage() {
+    const file = fileInput;
 
-   function removeImage() {
-     if (fileInputRef.current) fileInputRef.current.value = "";
-     setPreviewSrc("");
-     setImageActive(false);
-   }
+    if (!file) {
+      console.error("No file selected");
+      return;
+    }
 
-   // Table sorting
-   function sortTable(columnIndex: number) {
-     const isSameColumn = sortState.col === columnIndex;
-     const asc = isSameColumn ? !sortState.asc : false; // toggle or default descending
-     setSortState({ col: columnIndex, asc });
+    const formData = new FormData();
+    formData.append("file", file);
 
-     const sorted = [...rows].sort((a, b) => {
-       if (columnIndex === 0) {
-         return asc
-           ? a.object.localeCompare(b.object)
-           : b.object.localeCompare(a.object);
-       }
-       if (columnIndex === 1) {
-         return asc ? a.confidence - b.confidence : b.confidence - a.confidence;
-       }
-       // bbox string compare
-       return asc ? a.bbox.localeCompare(b.bbox) : b.bbox.localeCompare(a.bbox);
-     });
-     setRows(sorted);
-   }
+    try {
+      const response = await fetch("http://localhost:8000/detect", {
+        method: "POST",
+        body: formData,
+      });
 
-   // Chat auto-scroll
-   useEffect(() => {
-     const el = chatContainerRef.current;
-     if (el) el.scrollTop = el.scrollHeight;
-   }, [messages]);
+      if (!response.ok) {
+        console.error("Detection failed");
+        return;
+      }
 
-   // Example: programmatically add a message (e.g., after a detection)
-   function addAIMessage(text: string) {
-     setMessages((m) => [...m, { who: "ai", text }]);
-   }
+      const result = await response.json();
+
+      // OPTIONAL: update table + annotated preview
+      setRows(
+        result.detections.map((d) => {
+          return {
+            object:
+              d.class.charAt(0).toUpperCase() + d.class.slice(1).toLowerCase(),
+            confidence: Math.round(d.confidence * 100),
+            bbox: `(${Math.round(d.bbox[0])}, ${Math.round(
+              d.bbox[1]
+            )}, ${Math.round(d.bbox[2])}, ${Math.round(d.bbox[3])})`,
+          };
+        })
+      );
+
+      // If backend returns an annotated image:
+      if (result.annotated_image) {
+        setPreviewSrc(`data:image/jpeg;base64,${result.annotated_image}`);
+      }
+    } catch (err) {
+      console.error("Network error:", err);
+    }
+  }
+
+  function onDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+
+  function onDragLeave() {
+    setDragOver(false);
+  }
+
+  function onDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) handleFile(file);
+  }
+
+  function removeImage() {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setPreviewSrc("");
+    setImageActive(false);
+  }
+
+  // Table sorting
+  function sortTable(columnIndex: number) {
+    const isSameColumn = sortState.col === columnIndex;
+    const asc = isSameColumn ? !sortState.asc : false; // toggle or default descending
+    setSortState({ col: columnIndex, asc });
+
+    const sorted = [...rows].sort((a, b) => {
+      if (columnIndex === 0) {
+        return asc
+          ? a.object.localeCompare(b.object)
+          : b.object.localeCompare(a.object);
+      }
+      if (columnIndex === 1) {
+        return asc ? a.confidence - b.confidence : b.confidence - a.confidence;
+      }
+      // bbox string compare
+      return asc ? a.bbox.localeCompare(b.bbox) : b.bbox.localeCompare(a.bbox);
+    });
+    setRows(sorted);
+  }
+
+  // Chat auto-scroll
+  useEffect(() => {
+    const el = chatContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  useEffect(() => {
+    const img = document.getElementById("previewImg") as HTMLImageElement;
+    const canvas = document.getElementById(
+      "overlayCanvas"
+    ) as HTMLCanvasElement;
+
+    if (!img || !canvas || !rows.length) return;
+
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const colors = ["#10b981", "#2563eb", "#f59e0b", "#ec4899", "#8b5cf6"];
+
+    rows.forEach((r, idx) => {
+      console.log("🚀 ~ AIVisionDashboard ~ r:", r);
+      const [x1, y1, x2, y2] = r.bbox
+        .replace(/[()]/g, "")
+        .split(",")
+        .map((v) => parseInt(v.trim(), 10));
+
+      ctx.strokeStyle = colors[idx % colors.length];
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]); // dashed
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+      ctx.font = "16px Arial";
+      ctx.fillStyle = colors[idx % colors.length];
+      ctx.fillText(`${r.object} (${r.confidence}%)`, x1 + 4, y1 + 18);
+    });
+  }, [rows, previewSrc]);
+
+  // Example: programmatically add a message (e.g., after a detection)
+  function addAIMessage(text: string) {
+    setMessages((m) => [...m, { who: "ai", text }]);
+  }
 
   return (
     <>
@@ -199,11 +284,7 @@ export default function AIVisionDashboard() {
                 <button
                   type="button"
                   className="action-btn detect-btn"
-                  onClick={() =>
-                    addAIMessage(
-                      "Detect clicked - replace with actual detection"
-                    )
-                  }
+                  onClick={() => detectImage()}
                 >
                   Detect Objects
                 </button>
@@ -226,18 +307,31 @@ export default function AIVisionDashboard() {
                 <h3 className="card-title">Annotated Image</h3>
                 <span className="card-badge"> {rows.length} Objects</span>
               </div>
-              {previewSrc ? 
-                <div className="annotated-image-wrapper">
+              {previewSrc ? (
+                <div style={{ position: "relative", display: "inline-block" }}>
                   <img
-                    className="annotated-image"
-                    alt="Annotated"
-                    src={previewSrc || ""}
+                    src={previewSrc}
+                    alt="Preview"
+                    id="previewImg"
+                    style={{ display: "block" }}
+                  />
+                  <canvas
+                    id="overlayCanvas"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      pointerEvents: "none", // lets clicks pass through
+                    }}
                   />
                 </div>
-                : <img
+              ) : (
+                <img
                   src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'%3E%3Crect fill='%23f1f5f9' width='600' height='400'/%3E%3Crect x='80' y='120' width='180' height='160' fill='none' stroke='%2310b981' stroke-width='3' stroke-dasharray='8 4'/%3E%3Ctext x='90' y='145' font-family='Arial' font-size='14' font-weight='bold' fill='%2310b981'%3ECar (0.94)%3C/text%3E%3Crect x='340' y='80' width='140' height='180' fill='none' stroke='%232563eb' stroke-width='3' stroke-dasharray='8 4'/%3E%3Ctext x='350' y='105' font-family='Arial' font-size='14' font-weight='bold' fill='%232563eb'%3EPerson (0.89)%3C/text%3E%3Crect x='150' y='260' width='100' height='80' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-dasharray='8 4'/%3E%3Ctext x='160' y='285' font-family='Arial' font-size='14' font-weight='bold' fill='%23f59e0b'%3EBike (0.87)%3C/text%3E%3Crect x='380' y='280' width='120' height='90' fill='none' stroke='%23ec4899' stroke-width='3' stroke-dasharray='8 4'/%3E%3Ctext x='390' y='305' font-family='Arial' font-size='14' font-weight='bold' fill='%23ec4899'%3ESign (0.76)%3C/text%3E%3Crect x='20' y='30' width='80' height='60' fill='none' stroke='%238b5cf6' stroke-width='3' stroke-dasharray='8 4'/%3E%3Ctext x='30' y='55' font-family='Arial' font-size='14' font-weight='bold' fill='%238b5cf6'%3ETree (0.82)%3C/text%3E%3C/svg%3E"
-                  alt="Annotated" className="annotated-image"
-                />}
+                  alt="Annotated"
+                  className="annotated-image"
+                />
+              )}
             </div>
 
             <div className="result-card">

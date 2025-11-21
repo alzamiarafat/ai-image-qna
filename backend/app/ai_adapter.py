@@ -1,36 +1,44 @@
 import os
-import asyncio
-from typing import Any, Dict
+import google.generativeai as genai
+from fastapi.concurrency import run_in_threadpool
 
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+API_KEY = os.getenv("GOOGLE_API_KEY")
+print("DEBUG: GOOGLE_API_KEY =", API_KEY)
 
-async def ask_ai_openai(detections: Dict[str, Any], question: str) -> str:
-    # Minimal example using OpenAI REST API (Chat Completions v1). Replace with your preferred SDK.
-    import aiohttp
-    if not OPENAI_API_KEY:
-        return "OpenAI API key not configured. Set OPENAI_API_KEY in env."
-    prompt = f"Detections:\n{detections}\n\nQuestion: {question}\nAnswer concisely."
-    url = 'https://api.openai.com/v1/chat/completions'
-    headers = {
-        'Authorization': f'Bearer {OPENAI_API_KEY}',
-        'Content-Type': 'application/json'
-    }
-    payload = {
-        'model': 'gpt-4o-mini',
-        'messages': [{'role': 'user', 'content': prompt}],
-        'max_tokens': 256,
-    }
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload, headers=headers) as resp:
-            if resp.status != 200:
-                txt = await resp.text()
-                return f'AI provider error: {resp.status} - {txt}'
-            data = await resp.json()
-            try:
-                return data['choices'][0]['message']['content']
-            except Exception:
-                return str(data)
+if not API_KEY:
+    raise Exception("GOOGLE_API_KEY is missing! Set it in docker-compose.yml")
 
-async def ask_ai(detections: Dict[str, Any], question: str) -> str:
-    # Choose provider - currently only OpenAI implemented
-    return await ask_ai_openai(detections, question)
+genai.configure(api_key=API_KEY)
+
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+
+async def ask_ai(detections, question):
+    # Handle no detections gracefully
+    if not detections:
+        description = "No objects detected in the image."
+    else:
+        description = "\n".join(
+            f"- {d['class']} (confidence {d['confidence']:.2f})"
+            for d in detections
+        )
+
+    prompt = f"""
+        You are an AI assistant analyzing image detection results.
+
+        Image contains:
+        {description}
+
+        User question:
+        {question}
+
+        Provide a helpful and concise answer.
+        """
+
+    # Gemini is synchronous, so use threadpool
+    def call_gemini():
+        return model.generate_content(prompt)
+
+    response = await run_in_threadpool(call_gemini)
+
+    return response

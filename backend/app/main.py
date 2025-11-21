@@ -96,14 +96,19 @@ async def detect(file: UploadFile = File(...)):
 #             raise HTTPException(status_code=400, detail='file or image_url required')
 
 
-@app.post('/ai/question')
+@app.post("/ai/question")
 async def ai_question(payload: dict):
-    detections = payload.get('detections')
-    question = payload.get('question')
+    detections = payload.get("detections")
+    question = payload.get("question")
+
     if not question:
-        raise HTTPException(status_code=400, detail='question is required')
+        raise HTTPException(status_code=400, detail="question is required")
+
+    if detections is None:
+        raise HTTPException(status_code=400, detail="detections are required")
+
     answer = await ask_ai(detections, question)
-    return {'answer': answer}
+    return {"answer": answer}
 
 
 @app.get('/health')
