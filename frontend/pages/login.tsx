@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 
 export default function Page() {
   const router = useRouter();
-  const [tab, setTab] = useState("login");
+  const [tab, setTab] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,33 +22,39 @@ export default function Page() {
       ? "Enter your credentials to access your account"
       : "Sign up to start analyzing images with AI";
 
-  function switchTab(target) {
+  function switchTab(target: "login" | "signup") {
     setTab(target);
   }
 
-  function togglePassword(key) {
+  function togglePassword(key: "login" | "signup" | "signupConfirm") {
     setShowPasswords((prev) => ({ ...prev, [key]: !prev[key] }));
   }
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (tab === "login") {
-      const res = await fetch("http://localhost:9001/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_AUTH_URL}/api/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        }
+      );
       const data = await res.json();
       if (!res.ok) return alert(data.error);
       debugger;
       localStorage.setItem("userInfo", JSON.stringify(data));
       router.push("/dashboard");
     } else {
-      const res = await fetch("http://localhost:9001/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, password }),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_AUTH_URL}/api/auth/register`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fullName, email, password }),
+        }
+      );
       const data = await res.json();
       if (!res.ok) return alert(data.error);
 
@@ -112,8 +118,8 @@ export default function Page() {
                 <div className="feature-content">
                   <h3>AI-Powered Q&A</h3>
                   <p>
-                    Ask questions about detected objects using Gemini's advanced
-                    natural language understanding
+                    Ask questions about detected objects using Gemini&apos;s
+                    advanced natural language understanding
                   </p>
                 </div>
               </div>

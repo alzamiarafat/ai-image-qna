@@ -1,5 +1,17 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
+interface User {
+  fullName: string;
+  email: string;
+  _id: string;
+}
+
+interface Row {
+  object: string;
+  confidence: number;
+  bbox: string;
+  bbox_array: number[]; // this property exists in the data
+}
 
 export default function AIVisionDashboard() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -8,11 +20,11 @@ export default function AIVisionDashboard() {
 
   const [previewSrc, setPreviewSrc] = useState<string>("");
   const [imageActive, setImageActive] = useState(false);
-  const [fileInput, setFileInput] = useState(null);
+  const [fileInput, setFileInput] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [inputValue, setInputValue] = useState("");
 
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<Row[]>([]);
 
   const [sortState, setSortState] = useState<{
     col: number | null;
@@ -38,7 +50,7 @@ export default function AIVisionDashboard() {
 
   // Handle file selection via input
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files?.[0] || null;
     setFileInput(file);
     if (!file) return;
 
@@ -64,10 +76,13 @@ export default function AIVisionDashboard() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://localhost:8000/detect", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_YOLO_URL}/detect`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         console.error("Detection failed");
@@ -78,16 +93,23 @@ export default function AIVisionDashboard() {
 
       // OPTIONAL: update table + annotated preview
       setRows(
-        result.detections.map((d) => {
-          return {
-            object:
-              d.class.charAt(0).toUpperCase() + d.class.slice(1).toLowerCase(),
-            confidence: Math.round(d.confidence * 100),
-            bbox: `(${Math.round(d.bbox[0])}, ${Math.round(
-              d.bbox[1]
-            )}, ${Math.round(d.bbox[2])}, ${Math.round(d.bbox[3])})`,
-          };
-        })
+        result.detections.map(
+          (d: {
+            class: string;
+            confidence: number;
+            bbox: [number, number, number, number];
+          }) => {
+            return {
+              object:
+                d.class.charAt(0).toUpperCase() +
+                d.class.slice(1).toLowerCase(),
+              confidence: Math.round(d.confidence * 100),
+              bbox: `(${Math.round(d.bbox[0])}, ${Math.round(
+                d.bbox[1]
+              )}, ${Math.round(d.bbox[2])}, ${Math.round(d.bbox[3])})`,
+            };
+          }
+        )
       );
 
       // If backend returns an annotated image:
@@ -184,27 +206,31 @@ export default function AIVisionDashboard() {
   }, [rows, previewSrc]);
 
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
-      const userInfo = localStorage.getItem("userInfo");
-      if (!userInfo) {
+      const userInfoStr = localStorage.getItem("userInfo");
+      if (!userInfoStr) {
         router.push("/"); // redirect to login if no token
       }
       try {
-        const res = await fetch("http://localhost:9001/api/auth/current-user", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: JSON.parse(userInfo)._id }),
-        });
+        const userInfo: User = userInfoStr ? JSON.parse(userInfoStr) : null;
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_AUTH_URL}/api/auth/current-user`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: userInfo._id }),
+          }
+        );
         const data = await res.json();
         // debugger;
         // if (!res.ok) {
         //   router.push("/"); // redirect to login if not authenticated
         //   return alert(data.error);
         // }
-        setUser(JSON.parse(userInfo));
+        setUser(userInfo);
         return;
       } catch (err) {
         localStorage.removeItem("userInfo");
@@ -232,20 +258,23 @@ export default function AIVisionDashboard() {
     try {
       // ---- REAL API CALL ----
       const payload = {
-        question: "How many dog are there?",
+        question: val,
         detections: rows.map((r) => ({
           class: r.object.toLowerCase(),
           confidence: r.confidence / 100,
           bbox: r.bbox_array, // make sure this is [x1, y1, x2, y2] numbers
         })),
       };
-      const res = await fetch("http://localhost:8000/ai/question", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_YOLO_URL}/ai/question`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (!res.ok) {
         throw new Error("Network response failed");
