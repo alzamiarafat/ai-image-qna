@@ -7,7 +7,11 @@ Full-stack app: users sign up / log in, upload an image, run YOLO object detecti
 - Frontend: Next.js (React) — login/signup UI + main app
 - Backend: FastAPI (Python) — auth (Postgres), YOLO inference (Ultralytics), Gemini calls
 - Database: PostgreSQL (docker-compose)
-- Deployment: `docker compose up` launches all services
+- Deployment: 
+    `export GOOGLE_API_KEY=""`
+    `export NEXT_PUBLIC_AUTH_URL=http://localhost:9001`
+    `export NEXT_PUBLIC_YOLO_URL=http://localhost:8000`
+    `docker compose up` launches all services
 
 ## Key features
 
