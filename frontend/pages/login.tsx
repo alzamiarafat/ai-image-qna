@@ -1,8 +1,15 @@
 import Head from "next/head";
 import { useState } from "react";
+import { useRouter } from "next/router";
 
 export default function Page() {
+  const router = useRouter();
   const [tab, setTab] = useState("login");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [showPasswords, setShowPasswords] = useState({
     login: false,
     signup: false,
@@ -22,11 +29,32 @@ export default function Page() {
   function togglePassword(key) {
     setShowPasswords((prev) => ({ ...prev, [key]: !prev[key] }));
   }
-
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    // TODO: hook into your auth logic here
-    alert("Submit prevented in demo. Hook this up to your API.");
+
+    if (tab === "login") {
+      const res = await fetch("http://localhost:9001/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.error);
+      debugger;
+      localStorage.setItem("userInfo", JSON.stringify(data));
+      router.push("/dashboard");
+    } else {
+      const res = await fetch("http://localhost:9001/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName, email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.error);
+
+      alert("Account created successfully! Please log in.");
+      setTab("login");
+    }
   }
 
   return (
@@ -146,6 +174,7 @@ export default function Page() {
                       type="email"
                       id="login-email"
                       placeholder="you@example.com"
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
@@ -162,6 +191,7 @@ export default function Page() {
                       type={showPasswords.login ? "text" : "password"}
                       id="login-password"
                       placeholder="Enter your password"
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                     />
                     <button
@@ -239,6 +269,7 @@ export default function Page() {
                       type="text"
                       id="signup-name"
                       placeholder="John Doe"
+                      onChange={(e) => setFullName(e.target.value)}
                       required
                     />
                   </div>
@@ -255,6 +286,7 @@ export default function Page() {
                       type="email"
                       id="signup-email"
                       placeholder="you@example.com"
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
@@ -271,6 +303,7 @@ export default function Page() {
                       type={showPasswords.signup ? "text" : "password"}
                       id="signup-password"
                       placeholder="Create a password"
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                     />
                     <button
@@ -298,6 +331,16 @@ export default function Page() {
                       type={showPasswords.signupConfirm ? "text" : "password"}
                       id="signup-confirm"
                       placeholder="Confirm your password"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        // Validate password match in real-time
+                        if (e.target.value !== password) {
+                          setPasswordError("Passwords do not match");
+                        } else {
+                          setPasswordError("");
+                        }
+                      }}
                       required
                     />
                     <button
@@ -312,9 +355,24 @@ export default function Page() {
                       </svg>
                     </button>
                   </div>
+                  {passwordError && (
+                    <p
+                      style={{
+                        color: "red",
+                        fontSize: "13px",
+                        marginTop: "6px",
+                      }}
+                    >
+                      {passwordError}
+                    </p>
+                  )}
                 </div>
 
-                <button type="submit" className="submit-btn">
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={!!passwordError}
+                >
                   Create Account
                 </button>
 

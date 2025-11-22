@@ -1,4 +1,5 @@
-import React, {useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 
 export default function AIVisionDashboard() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -182,10 +183,41 @@ export default function AIVisionDashboard() {
     });
   }, [rows, previewSrc]);
 
-  // Example: programmatically add a message (e.g., after a detection)
-  function addAIMessage(text: string) {
-    setMessages((m) => [...m, { who: "ai", text }]);
-  }
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const userInfo = localStorage.getItem("userInfo");
+      if (!userInfo) {
+        router.push("/"); // redirect to login if no token
+      }
+      try {
+        const res = await fetch("http://localhost:9001/api/auth/current-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: JSON.parse(userInfo)._id }),
+        });
+        const data = await res.json();
+        // debugger;
+        // if (!res.ok) {
+        //   router.push("/"); // redirect to login if not authenticated
+        //   return alert(data.error);
+        // }
+        setUser(JSON.parse(userInfo));
+        return;
+      } catch (err) {
+        localStorage.removeItem("userInfo");
+        router.push("/");
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  // // Example: programmatically add a message (e.g., after a detection)
+  // function addAIMessage(text: string) {
+  //   setMessages((m) => [...m, { who: "ai", text }]);
+  // }
 
   async function sendMessage() {
     const val = inputValue.trim();
@@ -236,6 +268,11 @@ export default function AIVisionDashboard() {
     }
   }
 
+  async function submitLogout() {
+    localStorage.removeItem("userInfo");
+    router.push("/");
+  }
+
   return (
     <>
       <header className="header">
@@ -253,11 +290,13 @@ export default function AIVisionDashboard() {
             <div className="user-info">
               <div className="avatar">JD</div>
               <div className="user-details">
-                <div className="user-name">John Doe</div>
-                <div className="user-email">john.doe@example.com</div>
+                <div className="user-name">{user?.fullName}</div>
+                <div className="user-email">{user?.email}</div>
               </div>
             </div>
-            <button className="logout-btn">Logout</button>
+            <button className="logout-btn" onClick={submitLogout}>
+              Logout
+            </button>
           </div>
         </div>
       </header>
